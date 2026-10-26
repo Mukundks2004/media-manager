@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Media Manager</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; }
+  fieldset { margin-bottom: 1rem; } fieldset:disabled { opacity: .5; }
+  input { margin: 0 .5rem .5rem 0; } .msg { margin: .25rem 0; font-size: .9rem; } .ok { color: #070; } .err { color: #b00; }
+  table { width: 100%; border-collapse: collapse; } th, td { text-align: left; padding: 3px 6px; border-bottom: 1px solid #eee; }
+  td.num { text-align: right; white-space: nowrap; } .toggle { cursor: pointer; user-select: none; display: inline-block; width: 1.2em; }
+  button { margin-right: .25rem; }
+</style>
+</head>
+<body>
+<h1>Media Manager</h1>
+
+<fieldset id="s1"><legend>1. Server</legend>
+  <input id="host" placeholder="server name / IP" size="28">
+  <input id="port" type="number" value="22" style="width:5em">
+  <button id="checkBtn">Check connectivity</button>
+  <div id="m1" class="msg"></div>
+</fieldset>
+
+<fieldset id="s2" disabled><legend>2. SSH certificate (Ubuntu)</legend>
+  <input id="user" value="ubuntu" placeholder="username" size="12">
+  <input id="cert" type="file">
+  <input id="pass" type="password" placeholder="key passphrase (optional)">
+  <button id="connectBtn">Connect</button>
+  <div id="m2" class="msg"></div>
+</fieldset>
+
+<fieldset id="s3" disabled><legend>3. Folder</legend>
+  <input id="folder" placeholder="/var/www/media" size="40">
+  <button id="folderBtn">Check &amp; load</button>
+  <div id="m3" class="msg"></div>
+</fieldset>
+
+<fieldset id="s4" disabled><legend>4. Files</legend>
+  <button id="refreshBtn">Refresh</button>
+  <input id="upFile" type="file"> <span id="upTarget">Upload into: /</span>
+  <button id="uploadBtn">Upload (max 10MB)</button>
+  <div id="m4" class="msg"></div>
+  <table><thead><tr><th>Name</th><th>Size</th><th>Ext</th><th>Actions</th></tr></thead><tbody id="tree"></tbody></table>
+</fieldset>
+
+<script src="app.js"></script>
+</body>
+</html>
