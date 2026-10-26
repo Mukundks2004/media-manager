@@ -28,23 +28,20 @@ $('checkBtn').onclick = async () => {
   } catch (e) { msg('m1', e.message); $('s2').disabled = true; }
 };
 
-$('connectBtn').onclick = async () => {
-  try {
-    const f = $('cert').files[0];
-    if (!f) throw new Error('Choose a certificate / private key file.');
-    const fd = new FormData();
-    fd.append('host', $('host').value.trim()); fd.append('port', $('port').value);
-    fd.append('username', $('user').value.trim()); fd.append('passphrase', $('pass').value);
-    fd.append('cert', f);
-    msg('m2', 'Connecting...', true);
-    const r = await api('/api/connect', { method: 'POST', body: fd });
-    sessionId = r.sessionId;
-    msg('m2', 'Connected. ' + r.os, true);
-    $('s3').disabled = false;
-  } catch (e) { msg('m2', e.message); }
-};
+async function connect() {
+  const certPath = $('cert').value.trim();
+  if (!certPath) throw new Error('Enter the path to the certificate / private key file.');
+  msg('m2', 'Connecting...', true);
+  const r = await api('/api/connect', { json: {
+    host: $('host').value.trim(), port: $('port').value, username: $('user').value.trim(),
+    passphrase: $('pass').value, certPath,
+  } });
+  sessionId = r.sessionId;
+  msg('m2', 'Connected. ' + r.os, true);
+  $('s3').disabled = false;
+}
 
-$('folderBtn').onclick = async () => {
+async function loadFolder() {
   try {
     const r = await api('/api/folder', { json: { folder: $('folder').value } });
     msg('m3', `OK: cd and ls succeeded on ${r.root} (${r.entryCount} entries).`, true);
@@ -52,7 +49,26 @@ $('folderBtn').onclick = async () => {
     expanded.clear(); expanded.add(''); uploadDir = '';
     await refresh();
   } catch (e) { msg('m3', e.message); $('s4').disabled = true; }
-};
+}
+
+$('connectBtn').onclick = async () => { try { await connect(); } catch (e) { msg('m2', e.message); } };
+$('folderBtn').onclick = loadFolder;
+
+// Prefill from saved config and connect automatically.
+(async () => {
+  const c = await api('/api/config').catch(() => ({}));
+  if (c.host) $('host').value = c.host;
+  if (c.port) $('port').value = c.port;
+  if (c.username) $('user').value = c.username;
+  if (c.certPath) $('cert').value = c.certPath;
+  if (c.folder) $('folder').value = c.folder;
+  if (!c.host || !c.certPath) return;
+  try {
+    await $('checkBtn').onclick();
+    await connect();
+    if (c.folder) await loadFolder();
+  } catch (e) { msg('m2', e.message); }
+})();
 
 async function refresh() {
   try {

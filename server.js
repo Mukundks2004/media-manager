@@ -67,14 +67,34 @@ app.post('/api/check', wrap(async (req, res) => {
   res.json({ ok: true, ms: Date.now() - start });
 }));
 
-app.post('/api/connect', upload.single('cert'), wrap(async (req, res) => {
-  const { host, port = 22, username = 'ubuntu', passphrase } = req.body;
-  if (!host || !req.file) throw fail(400, 'Server name and certificate (private key) are required.');
+const CONFIG_FILE = path.join(__dirname, 'config.json');
+const readConfig = () => { try { return JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch { return {}; } };
+const saveConfig = (patch) => fs.writeFileSync(CONFIG_FILE, JSON.stringify({ ...readConfig(), ...patch }, null, 2));
+
+app.get('/api/config', (req, res) => res.json(readConfig()));
+
+async function setFolder(s, folder) {
+  folder = String(folder || '').trim();
+  if (!folder) throw fail(400, 'Folder is required.');
+  const r = await exec(s.conn, `cd ${q(folder)} && pwd -P && ls`);
+  if (r.code !== 0) throw fail(400, `Cannot cd/ls "${folder}": ${r.err.trim() || 'exit ' + r.code}`);
+  const [real, ...entries] = r.out.split('\n').filter(Boolean);
+  s.root = real;
+  saveConfig({ folder });
+  return { ok: true, root: real, entryCount: entries.length };
+}
+
+app.post('/api/connect', wrap(async (req, res) => {
+  const { host, port = 22, username = 'ubuntu', passphrase, certPath } = req.body;
+  if (!host || !certPath) throw fail(400, 'Server name and certificate path are required.');
+  let key;
+  try { key = fs.readFileSync(String(certPath).trim().replace(/^"|"$/g, '')); }
+  catch (e) { throw fail(400, `Cannot read certificate: ${e.message}`); }
   const conn = new Client();
   await new Promise((resolve, reject) => {
     conn.on('ready', resolve).on('error', reject).connect({
       host, port: Number(port), username,
-      privateKey: req.file.buffer,
+      privateKey: key,
       passphrase: passphrase || undefined,
       readyTimeout: 10000,
     });
@@ -85,6 +105,7 @@ app.post('/api/connect', upload.single('cert'), wrap(async (req, res) => {
   sessions.set(id, session);
   conn.on('close', () => sessions.delete(id));
   const { out } = await exec(conn, 'lsb_release -ds 2>/dev/null || head -n1 /etc/os-release');
+  saveConfig({ host, port: Number(port), username, certPath: String(certPath).trim() });
   res.json({ sessionId: id, os: out.trim() });
 }));
 
@@ -96,14 +117,7 @@ app.post('/api/disconnect', wrap(async (req, res) => {
 }));
 
 app.post('/api/folder', wrap(async (req, res) => {
-  const s = getSession(req);
-  const folder = String(req.body.folder || '').trim();
-  if (!folder) throw fail(400, 'Folder is required.');
-  const r = await exec(s.conn, `cd ${q(folder)} && pwd -P && ls`);
-  if (r.code !== 0) throw fail(400, `Cannot cd/ls "${folder}": ${r.err.trim() || 'exit ' + r.code}`);
-  const [real, ...entries] = r.out.split('\n').filter(Boolean);
-  s.root = real;
-  res.json({ ok: true, root: real, entryCount: entries.length });
+  res.json(await setFolder(getSession(req), req.body.folder));
 }));
 
 app.get('/api/tree', wrap(async (req, res) => {
